@@ -2,10 +2,7 @@ module github.com/tomsiewert/elastiflow-to-netmeta
 
 go 1.20
 
-require (
-	github.com/ClickHouse/clickhouse-go/v2 v2.15.0
-	github.com/seancfoley/ipaddress-go v1.5.5
-)
+require github.com/ClickHouse/clickhouse-go/v2 v2.15.0
 
 require (
 	github.com/ClickHouse/ch-go v0.60.0 // indirect
@@ -17,7 +14,6 @@ require (
 	github.com/paulmach/orb v0.10.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/seancfoley/bintree v1.2.3 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	go.opentelemetry.io/otel v1.21.0 // indirect

@@ -1,6 +1,6 @@
 package misc
 
-import "github.com/seancfoley/ipaddress-go/ipaddr"
+import "net/netip"
 
 func MakeRange(min, max int) []int {
 	a := make([]int, max-min+1)
@@ -11,12 +11,8 @@ func MakeRange(min, max int) []int {
 }
 
 func ConvertIPv4ToIPv6(input string) string {
-	address := ipaddr.NewIPAddressString(input).GetAddress()
-	if address.IsIPv4() {
-		convertedIPv4, _ := address.ToIPv4().GetIPv4MappedAddress()
-		lastIp, _ := convertedIPv4.ToMixedString()
-		return lastIp
-	} else {
-		return input
+	if address, _ := netip.ParseAddr(input); address.Is4() {
+		return netip.AddrFrom16(address.As16()).String()
 	}
+	return input
 }
