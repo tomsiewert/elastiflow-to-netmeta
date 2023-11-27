@@ -10,9 +10,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/tomsiewert/elastiflow-to-netmeta/internal/misc"
 	clickhouse "github.com/ClickHouse/clickhouse-go/v2"
 	chiDriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/tomsiewert/elastiflow-to-netmeta/internal/misc"
 )
 
 var (
@@ -27,8 +27,8 @@ var (
 	workerCount         = flag.Int("batch-workers", 10, "Number of workers to process batches")
 
 	enableLog = flag.Bool("enable-log", false, "")
-	year = flag.Int("year", 2023, "")
-	month = flag.Int("month", 1, "")
+	year      = flag.Int("year", 2023, "")
+	month     = flag.Int("month", 1, "")
 	startDay  = flag.Int("start-day", 1, "")
 	endDay    = flag.Int("end-day", 31, "")
 )
@@ -162,14 +162,12 @@ func main() {
 
 		log.Println("Generate SQL from pre-queried OS-data")
 
-		if !*dryRun {
-			if *connectToClickhouse {
-				log.Println("Connect to Clickhouse using native driver")
-				var err error
-				conn, err = connect()
-				if err != nil {
-					panic((err))
-				}
+		if !*dryRun && *connectToClickhouse {
+			log.Println("Connect to Clickhouse using native driver")
+			var err error
+			conn, err = connect()
+			if err != nil {
+				panic((err))
 			}
 		}
 		for _, day := range days {
@@ -225,6 +223,9 @@ func main() {
 
 			close(linesChan)
 			wg.Wait()
+		}
+		if !*dryRun && *connectToClickhouse {
+			conn.Close()
 		}
 	}
 }
