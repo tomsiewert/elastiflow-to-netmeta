@@ -153,11 +153,11 @@ func main() {
 	log.Println("Hi Mom")
 	flag.Parse()
 
-	days := misc.MakeRange(*startDay, *endDay)
 	if *generateSQL {
 		var (
 			conn chiDriver.Conn
 			ctx  = context.Background()
+			days = misc.MakeRange(*startDay, *endDay)
 		)
 
 		log.Println("Generate SQL from pre-queried OS-data")
@@ -170,60 +170,70 @@ func main() {
 				panic((err))
 			}
 		}
+
+		var wg sync.WaitGroup
+		var workerWg sync.WaitGroup
+		linesChan := make(chan []string, *workerCount)
+
+		for i := 0; i < *workerCount; i++ {
+			workerWg.Add(1)
+			go func() {
+				defer workerWg.Done()
+				for lines := range linesChan {
+					processLines(lines, conn, &ctx)
+				}
+			}()
+		}
+
 		for _, day := range days {
 			dayString := fmt.Sprintf("%04d-%02d-%02d", *year, *month, day)
-			log.Println("Inject SQL data to", dayString)
+			log.Println("Inject SQL data for", dayString)
+			wg.Add(1)
 
-			jsonFile, err := os.Open(dayString + ".json")
-			if err != nil {
-				log.Fatalln(err)
-			}
-			defer jsonFile.Close()
+			go func(filePath string) {
+				defer wg.Done()
 
-			linesChan := make(chan []string, *workerCount)
-			var wg sync.WaitGroup
-
-			for i := 0; i < *workerCount; i++ {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					for lines := range linesChan {
-						processLines(lines, conn, &ctx)
-					}
-				}()
-			}
-
-			jsonScanner := bufio.NewScanner(jsonFile)
-			var lines []string
-
-			for jsonScanner.Scan() {
-				line := jsonScanner.Text()
-				lines = append(lines, line)
-
-				if len(lines) == *batchSize {
-					linesCopy := append([]string(nil), lines...)
-					wg.Add(1)
-					linesChan <- linesCopy
-
-					lines = nil
+				jsonFile, err := os.Open(dayString + ".json")
+				if err != nil {
+					log.Fatalln(err)
 				}
-			}
+				defer jsonFile.Close()
 
-			if err := jsonScanner.Err(); err != nil {
-				fmt.Println("Error reading file:", err)
-				close(linesChan)
-				return
-			}
+				jsonScanner := bufio.NewScanner(jsonFile)
+				var lines []string
+				for jsonScanner.Scan() {
+					line := jsonScanner.Text()
+					lines = append(lines, line)
 
-			if len(lines) > 0 {
-				wg.Add(1)
-				linesCopy := append([]string(nil), lines...)
-				linesChan <- linesCopy
-			}
+					if len(lines) == *batchSize {
+						linesCopy := append([]string(nil), lines...)
+						workerWg.Add(1)
+						linesChan <- linesCopy
+						lines = nil
+					}
+				}
 
-			close(linesChan)
-			wg.Wait()
+				if err := jsonScanner.Err(); err != nil {
+					fmt.Println("Error reading file:", err)
+					close(linesChan)
+					return
+				}
+
+				if len(lines) > 0 {
+					workerWg.Add(1)
+					linesCopy := append([]string(nil), lines...)
+					linesChan <- linesCopy
+				}
+
+			}(dayString + ".json")
 		}
+
+		go func() {
+			wg.Wait()
+			close(linesChan)
+		}()
+
+		workerWg.Wait()
 		if !*dryRun && *connectToClickhouse {
 			conn.Close()
 		}
